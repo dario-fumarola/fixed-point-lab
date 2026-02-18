@@ -10,6 +10,7 @@ from fplab.training.train_unrolled import TrainConfig, train_synthetic
 @dataclass
 class BenchmarkConfig:
     seed: int = 0
+    deterministic: bool = False
     dim: int = 16
     batch_size: int = 16
     train_steps: int = 20
@@ -24,6 +25,7 @@ def run_benchmark(cfg: BenchmarkConfig) -> dict[str, dict[str, float | int]]:
         metrics = train_synthetic(
             TrainConfig(
                 seed=cfg.seed + idx,
+                deterministic=cfg.deterministic,
                 dim=cfg.dim,
                 batch_size=cfg.batch_size,
                 train_steps=cfg.train_steps,
@@ -40,6 +42,7 @@ def run_benchmark(cfg: BenchmarkConfig) -> dict[str, dict[str, float | int]]:
 def _parse_args() -> BenchmarkConfig:
     parser = argparse.ArgumentParser(description="Benchmark unrolled training across operators.")
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--deterministic", action="store_true")
     parser.add_argument("--dim", type=int, default=16)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--train-steps", type=int, default=20)
@@ -55,6 +58,7 @@ def _parse_args() -> BenchmarkConfig:
 
     return BenchmarkConfig(
         seed=args.seed,
+        deterministic=args.deterministic,
         dim=args.dim,
         batch_size=args.batch_size,
         train_steps=args.train_steps,

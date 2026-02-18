@@ -29,6 +29,7 @@ fplab-train-synth --dim 32 --operator blur --solver-iters 6 --prox-iters 60 --tr
 
 Use `--fixed-batch` to quickly sanity-check that the optimization loop can overfit one batch.
 Use `--save-path checkpoints/run.pt` to save learned parameters and run metadata.
+Use `--deterministic` for stricter reproducibility.
 
 ## Benchmark operators
 ```bash

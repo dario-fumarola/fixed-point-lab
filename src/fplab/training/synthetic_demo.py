@@ -10,11 +10,13 @@ from fplab.models.icnn import ICNNConfig, ICNNRegularizer
 from fplab.operators.fidelity import LeastSquaresFidelity
 from fplab.prox.prox_icnn import ICNNProxSolver, ProxConfig
 from fplab.solvers.proxgrad import ProxGradSolver
+from fplab.utils.reproducibility import set_seed
 
 
 @dataclass
 class DemoConfig:
     seed: int = 0
+    deterministic: bool = False
     batch_size: int = 8
     dim: int = 32
     noise_std: float = 0.02
@@ -30,7 +32,7 @@ def _psnr(pred: torch.Tensor, target: torch.Tensor, eps: float = 1e-8) -> float:
 
 
 def run_demo(cfg: DemoConfig) -> dict[str, float | int | bool]:
-    torch.manual_seed(cfg.seed)
+    set_seed(cfg.seed, deterministic=cfg.deterministic)
 
     A = torch.eye(cfg.dim)
     fidelity = LeastSquaresFidelity(A=A)
@@ -67,6 +69,7 @@ def run_demo(cfg: DemoConfig) -> dict[str, float | int | bool]:
 def _parse_args() -> DemoConfig:
     parser = argparse.ArgumentParser(description="Run synthetic fixed-point solver demo.")
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--deterministic", action="store_true")
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--dim", type=int, default=32)
     parser.add_argument("--noise-std", type=float, default=0.02)
@@ -76,6 +79,7 @@ def _parse_args() -> DemoConfig:
 
     return DemoConfig(
         seed=args.seed,
+        deterministic=args.deterministic,
         batch_size=args.batch_size,
         dim=args.dim,
         noise_std=args.noise_std,

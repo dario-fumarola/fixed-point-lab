@@ -12,11 +12,13 @@ from fplab.operators.fidelity import LeastSquaresFidelity
 from fplab.operators.linear import make_blur_operator, make_identity_operator, make_random_operator
 from fplab.prox.prox_icnn import ICNNProxSolver, ProxConfig
 from fplab.solvers.proxgrad import ProxGradSolver
+from fplab.utils.reproducibility import set_seed
 
 
 @dataclass
 class TrainConfig:
     seed: int = 0
+    deterministic: bool = False
     dim: int = 32
     batch_size: int = 32
     noise_std: float = 0.03
@@ -54,7 +56,7 @@ def _sample_batch(
 
 
 def train_synthetic(cfg: TrainConfig) -> dict[str, float | int]:
-    torch.manual_seed(cfg.seed)
+    set_seed(cfg.seed, deterministic=cfg.deterministic)
 
     A = _make_operator(cfg.dim, cfg.operator)
     fidelity = LeastSquaresFidelity(A=A)
@@ -126,6 +128,7 @@ def train_synthetic(cfg: TrainConfig) -> dict[str, float | int]:
 def _parse_args() -> TrainConfig:
     parser = argparse.ArgumentParser(description="Train ICNN regularizer with unrolled prox-gradient.")
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--deterministic", action="store_true")
     parser.add_argument("--dim", type=int, default=32)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--noise-std", type=float, default=0.03)
@@ -142,6 +145,7 @@ def _parse_args() -> TrainConfig:
 
     return TrainConfig(
         seed=args.seed,
+        deterministic=args.deterministic,
         dim=args.dim,
         batch_size=args.batch_size,
         noise_std=args.noise_std,
