@@ -1,0 +1,10 @@
+seed: 0
+task: denoise
+model:
+  input_dim: 64
+  hidden_dims: [128, 128]
+  mu_quadratic: 0.001
+solver:
+  lam: 0.1
+  max_iter: 50
+  tol: 1e-5
