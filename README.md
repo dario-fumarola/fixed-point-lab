@@ -5,6 +5,7 @@ Research repo for convergence-guaranteed neural fixed-point solvers for inverse 
 ## Initial scope
 - Convex ICNN regularizer with hard convexity constraints
 - Proximal-gradient fixed-point solver
+- Generic Krasnoselskii-Mann fixed-point iterator
 - Unit tests checking convexity, prox residual behavior, and convergence on least-squares tasks
 
 ## Quickstart
