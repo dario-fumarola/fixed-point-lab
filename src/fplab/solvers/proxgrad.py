@@ -13,6 +13,8 @@ from fplab.prox.prox_icnn import ICNNProxSolver
 class SolveTrace:
     residuals: list[float]
     objectives: list[float]
+    prox_grad_norms: list[float]
+    prox_thresholds: list[float]
 
 
 class ProxGradSolver:
@@ -29,7 +31,7 @@ class ProxGradSolver:
         y: torch.Tensor,
         lam: float,
         differentiable: bool = False,
-    ) -> tuple[torch.Tensor, float]:
+    ) -> tuple[torch.Tensor, float, float]:
         if lam < 0:
             raise ValueError("lam must be nonnegative")
 
@@ -46,7 +48,7 @@ class ProxGradSolver:
             regularizer=self.regularizer,
             differentiable=differentiable,
         )
-        return x_next, info.grad_norm
+        return x_next, info.grad_norm, info.threshold
 
     def objective(self, x: torch.Tensor, y: torch.Tensor, lam: float) -> torch.Tensor:
         return self.fidelity.value(x, y) + lam * self.regularizer(x)
@@ -64,11 +66,15 @@ class ProxGradSolver:
         x = x0.clone()
         residuals: list[float] = []
         objectives: list[float] = []
+        prox_grad_norms: list[float] = []
+        prox_thresholds: list[float] = []
 
         for _ in range(max_iter):
-            x_next, prox_grad_norm = self.step(x, y, lam, differentiable=differentiable)
+            x_next, prox_grad_norm, prox_threshold = self.step(x, y, lam, differentiable=differentiable)
             residual = float(torch.linalg.norm(x_next - x).item())
             residuals.append(residual)
+            prox_grad_norms.append(prox_grad_norm)
+            prox_thresholds.append(prox_threshold)
             obj = torch.mean(self.objective(x_next, y, lam))
             objectives.append(float(obj.item()))
             x = x_next
@@ -76,4 +82,9 @@ class ProxGradSolver:
             if early_stop and residual <= tol and prox_grad_norm <= max(tol, 1e-6):
                 break
 
-        return x, SolveTrace(residuals=residuals, objectives=objectives)
+        return x, SolveTrace(
+            residuals=residuals,
+            objectives=objectives,
+            prox_grad_norms=prox_grad_norms,
+            prox_thresholds=prox_thresholds,
+        )

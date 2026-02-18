@@ -7,4 +7,5 @@ from dataclasses import dataclass
 class ProxStopInfo:
     iters: int
     grad_norm: float
+    threshold: float
     converged: bool

@@ -13,6 +13,7 @@ class ProxConfig:
     max_iters: int = 250
     lr: float = 5e-2
     tol: float = 1e-6
+    rel_tol: float = 0.0
 
 
 class ICNNProxSolver:
@@ -38,6 +39,7 @@ class ICNNProxSolver:
         x = init.clone().requires_grad_(True)
         converged = False
         last_grad_norm = float("inf")
+        threshold = float("inf")
 
         for it in range(1, self.config.max_iters + 1):
             obj = 0.5 * torch.sum((x - v) ** 2, dim=-1) + alpha * lam * regularizer(x)
@@ -47,10 +49,17 @@ class ICNNProxSolver:
             if not differentiable:
                 x = x.detach().requires_grad_(True)
             last_grad_norm = float(torch.linalg.norm(grad).item())
+            x_norm = float(torch.linalg.norm(x).item())
+            threshold = max(self.config.tol, self.config.rel_tol * x_norm)
 
-            if last_grad_norm <= self.config.tol:
+            if last_grad_norm <= threshold:
                 converged = True
                 break
 
         result = x if differentiable else x.detach()
-        return result, ProxStopInfo(iters=it, grad_norm=last_grad_norm, converged=converged)
+        return result, ProxStopInfo(
+            iters=it,
+            grad_norm=last_grad_norm,
+            threshold=threshold,
+            converged=converged,
+        )
