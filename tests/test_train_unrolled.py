@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fplab.training.train_unrolled import TrainConfig, train_synthetic
 
 
-def test_train_unrolled_smoke_fixed_batch_improves() -> None:
+def test_train_unrolled_smoke_fixed_batch_improves(tmp_path: Path) -> None:
+    ckpt_path = tmp_path / "ckpt.pt"
     metrics = train_synthetic(
         TrainConfig(
             seed=0,
@@ -14,9 +17,12 @@ def test_train_unrolled_smoke_fixed_batch_improves() -> None:
             train_steps=10,
             learning_rate=2e-3,
             fixed_batch=True,
+            operator="blur",
+            save_path=str(ckpt_path),
         )
     )
 
     assert int(metrics["train_steps"]) == 10
     assert float(metrics["best_loss"]) <= float(metrics["initial_loss"]) + 1e-6
     assert float(metrics["final_loss"]) <= float(metrics["initial_loss"]) * 1.10
+    assert ckpt_path.exists()

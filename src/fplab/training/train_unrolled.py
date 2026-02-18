@@ -3,11 +3,13 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import dataclass
+from pathlib import Path
 
 import torch
 
 from fplab.models.icnn import ICNNConfig, ICNNRegularizer
 from fplab.operators.fidelity import LeastSquaresFidelity
+from fplab.operators.linear import make_blur_operator, make_identity_operator, make_random_operator
 from fplab.prox.prox_icnn import ICNNProxSolver, ProxConfig
 from fplab.solvers.proxgrad import ProxGradSolver
 
@@ -25,13 +27,18 @@ class TrainConfig:
     learning_rate: float = 1e-3
     grad_clip: float = 5.0
     fixed_batch: bool = False
+    operator: str = "random"
+    save_path: str | None = None
 
 
-def _make_operator(dim: int) -> torch.Tensor:
-    """Create a normalized square sensing operator with ||A||_2 ~ 1."""
-    A = torch.randn(dim, dim) / (dim**0.5)
-    smax = torch.linalg.matrix_norm(A, ord=2)
-    return A / torch.clamp(smax, min=1e-6)
+def _make_operator(dim: int, operator: str) -> torch.Tensor:
+    if operator == "random":
+        return make_random_operator(dim)
+    if operator == "identity":
+        return make_identity_operator(dim)
+    if operator == "blur":
+        return make_blur_operator(dim)
+    raise ValueError(f"unsupported operator: {operator}")
 
 
 def _sample_batch(
@@ -49,7 +56,7 @@ def _sample_batch(
 def train_synthetic(cfg: TrainConfig) -> dict[str, float | int]:
     torch.manual_seed(cfg.seed)
 
-    A = _make_operator(cfg.dim)
+    A = _make_operator(cfg.dim, cfg.operator)
     fidelity = LeastSquaresFidelity(A=A)
 
     regularizer = ICNNRegularizer(
@@ -92,12 +99,28 @@ def train_synthetic(cfg: TrainConfig) -> dict[str, float | int]:
 
         loss_history.append(float(total_loss.detach().item()))
 
-    return {
+    metrics = {
         "train_steps": cfg.train_steps,
         "initial_loss": loss_history[0],
         "final_loss": loss_history[-1],
         "best_loss": min(loss_history),
+        "operator_lipschitz": fidelity.lipschitz(),
     }
+
+    if cfg.save_path:
+        path = Path(cfg.save_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(
+            {
+                "regularizer_state_dict": regularizer.state_dict(),
+                "operator": A,
+                "config": cfg.__dict__,
+                "metrics": metrics,
+            },
+            path,
+        )
+
+    return metrics
 
 
 def _parse_args() -> TrainConfig:
@@ -113,6 +136,8 @@ def _parse_args() -> TrainConfig:
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--grad-clip", type=float, default=5.0)
     parser.add_argument("--fixed-batch", action="store_true")
+    parser.add_argument("--operator", type=str, default="random", choices=["random", "identity", "blur"])
+    parser.add_argument("--save-path", type=str, default=None)
     args = parser.parse_args()
 
     return TrainConfig(
@@ -127,6 +152,8 @@ def _parse_args() -> TrainConfig:
         learning_rate=args.learning_rate,
         grad_clip=args.grad_clip,
         fixed_batch=args.fixed_batch,
+        operator=args.operator,
+        save_path=args.save_path,
     )
 
 
