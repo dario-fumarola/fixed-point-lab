@@ -14,3 +14,9 @@ source .venv/bin/activate
 uv pip install -e ".[dev]"
 pytest
 ```
+
+## Run synthetic demo
+```bash
+source .venv/bin/activate
+fplab-demo --dim 32 --iters 30 --lam 0.1
+```
