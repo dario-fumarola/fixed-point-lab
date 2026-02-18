@@ -28,6 +28,7 @@ dev = [
 [project.scripts]
 fplab-demo = "fplab.training.synthetic_demo:main"
 fplab-train-synth = "fplab.training.train_unrolled:main"
+fplab-benchmark-ops = "fplab.training.benchmark_operators:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fplab"]

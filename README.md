@@ -29,3 +29,9 @@ fplab-train-synth --dim 32 --operator blur --solver-iters 6 --prox-iters 60 --tr
 
 Use `--fixed-batch` to quickly sanity-check that the optimization loop can overfit one batch.
 Use `--save-path checkpoints/run.pt` to save learned parameters and run metadata.
+
+## Benchmark operators
+```bash
+source .venv/bin/activate
+fplab-benchmark-ops --dim 16 --train-steps 20 --operators identity,random,blur
+```
