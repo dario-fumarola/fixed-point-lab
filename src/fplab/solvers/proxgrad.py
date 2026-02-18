@@ -23,7 +23,13 @@ class ProxGradSolver:
         self.regularizer = regularizer
         self.prox_solver = prox_solver
 
-    def step(self, x: torch.Tensor, y: torch.Tensor, lam: float) -> tuple[torch.Tensor, float]:
+    def step(
+        self,
+        x: torch.Tensor,
+        y: torch.Tensor,
+        lam: float,
+        differentiable: bool = False,
+    ) -> tuple[torch.Tensor, float]:
         if lam < 0:
             raise ValueError("lam must be nonnegative")
 
@@ -33,7 +39,13 @@ class ProxGradSolver:
 
         alpha = 1.0 / Lf
         v = x - alpha * self.fidelity.grad(x, y)
-        x_next, info = self.prox_solver.prox(v, alpha=alpha, lam=lam, regularizer=self.regularizer)
+        x_next, info = self.prox_solver.prox(
+            v,
+            alpha=alpha,
+            lam=lam,
+            regularizer=self.regularizer,
+            differentiable=differentiable,
+        )
         return x_next, info.grad_norm
 
     def objective(self, x: torch.Tensor, y: torch.Tensor, lam: float) -> torch.Tensor:
@@ -46,20 +58,22 @@ class ProxGradSolver:
         lam: float,
         max_iter: int = 100,
         tol: float = 1e-5,
+        differentiable: bool = False,
+        early_stop: bool = True,
     ) -> tuple[torch.Tensor, SolveTrace]:
         x = x0.clone()
         residuals: list[float] = []
         objectives: list[float] = []
 
         for _ in range(max_iter):
-            x_next, prox_grad_norm = self.step(x, y, lam)
+            x_next, prox_grad_norm = self.step(x, y, lam, differentiable=differentiable)
             residual = float(torch.linalg.norm(x_next - x).item())
             residuals.append(residual)
             obj = torch.mean(self.objective(x_next, y, lam))
             objectives.append(float(obj.item()))
             x = x_next
 
-            if residual <= tol and prox_grad_norm <= max(tol, 1e-6):
+            if early_stop and residual <= tol and prox_grad_norm <= max(tol, 1e-6):
                 break
 
         return x, SolveTrace(residuals=residuals, objectives=objectives)

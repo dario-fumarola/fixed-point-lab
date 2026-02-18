@@ -20,3 +20,11 @@ pytest
 source .venv/bin/activate
 fplab-demo --dim 32 --iters 30 --lam 0.1
 ```
+
+## Train unrolled synthetic model
+```bash
+source .venv/bin/activate
+fplab-train-synth --dim 32 --solver-iters 6 --prox-iters 60 --train-steps 80
+```
+
+Use `--fixed-batch` to quickly sanity-check that the optimization loop can overfit one batch.
