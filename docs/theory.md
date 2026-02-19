@@ -24,3 +24,7 @@ x_{k+1} = prox_{alpha * lambda * R_theta}(y_k - alpha * grad f(y_k; y))
 
 with optional monotone safeguarding in inference mode (fallback to a plain PG step when acceleration
 increases the objective).
+
+For generic fixed-point maps `x = T(x)`, the codebase includes:
+- Krasnoselskii-Mann iteration
+- Anderson acceleration (regularized multisecant mixing)
