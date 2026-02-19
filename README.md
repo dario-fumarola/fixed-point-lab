@@ -27,6 +27,11 @@ Try accelerated fixed-point updates:
 fplab-demo --dim 32 --iters 30 --lam 0.1 --solver fista
 ```
 
+Try robust proximal-gradient with backtracking from an aggressive initial step:
+```bash
+fplab-demo --dim 32 --iters 30 --solver pg --alpha-scale 6.0 --line-search
+```
+
 ## Train unrolled synthetic model
 ```bash
 source .venv/bin/activate

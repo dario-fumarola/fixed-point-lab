@@ -15,6 +15,9 @@ Solver choices:
 
 Use `--solver fista` in training/demo CLIs to enable acceleration.
 
+For inference diagnostics in the synthetic demo, proximal-gradient also supports
+backtracking line search via `--line-search` and `--alpha-scale`.
+
 Operator options currently supported:
 - `identity`: denoising-style setting.
 - `random`: normalized dense sensing matrix.

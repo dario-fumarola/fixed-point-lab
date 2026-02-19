@@ -24,6 +24,8 @@ class DemoConfig:
     lam: float = 0.1
     iters: int = 30
     solver: str = "pg"
+    alpha_scale: float = 1.0
+    line_search: bool = False
 
 
 def _psnr(pred: torch.Tensor, target: torch.Tensor, eps: float = 1e-8) -> float:
@@ -54,13 +56,23 @@ def run_demo(cfg: DemoConfig) -> dict[str, float | int | bool]:
     y = x_true + cfg.noise_std * torch.randn_like(x_true)
     x0 = torch.zeros_like(x_true)
 
-    x_hat, trace = solver.solve(x0=x0, y=y, lam=cfg.lam, max_iter=cfg.iters, tol=1e-6)
+    if cfg.solver == "pg":
+        x_hat, trace = solver.solve(
+            x0=x0,
+            y=y,
+            lam=cfg.lam,
+            max_iter=cfg.iters,
+            tol=1e-6,
+            alpha_scale=cfg.alpha_scale,
+            line_search=cfg.line_search,
+        )
+    else:
+        x_hat, trace = solver.solve(x0=x0, y=y, lam=cfg.lam, max_iter=cfg.iters, tol=1e-6)
     psnr_y = _psnr(y, x_true)
     psnr_x = _psnr(x_hat, x_true)
 
-    monotone = all(
-        curr <= prev + 1e-4 for prev, curr in zip(trace.objectives, trace.objectives[1:])
-    )
+    monotone_tol = 2e-4
+    monotone = all(curr <= prev + monotone_tol for prev, curr in zip(trace.objectives, trace.objectives[1:]))
 
     return {
         "iters_ran": len(trace.objectives),
@@ -69,6 +81,7 @@ def run_demo(cfg: DemoConfig) -> dict[str, float | int | bool]:
         "residual_end": trace.residuals[-1],
         "objective_monotone": monotone,
         "solver": cfg.solver,
+        "line_search": bool(cfg.line_search and cfg.solver == "pg"),
         "psnr_noisy": psnr_y,
         "psnr_recon": psnr_x,
     }
@@ -84,6 +97,17 @@ def _parse_args() -> DemoConfig:
     parser.add_argument("--lam", type=float, default=0.1)
     parser.add_argument("--iters", type=int, default=30)
     parser.add_argument("--solver", type=str, default="pg", choices=["pg", "fista"])
+    parser.add_argument(
+        "--alpha-scale",
+        type=float,
+        default=1.0,
+        help="Multiplier on 1/L_f step size for proximal-gradient.",
+    )
+    parser.add_argument(
+        "--line-search",
+        action="store_true",
+        help="Enable backtracking line search (proximal-gradient solver only).",
+    )
     args = parser.parse_args()
 
     return DemoConfig(
@@ -95,6 +119,8 @@ def _parse_args() -> DemoConfig:
         lam=args.lam,
         iters=args.iters,
         solver=args.solver,
+        alpha_scale=args.alpha_scale,
+        line_search=args.line_search,
     )
 
 

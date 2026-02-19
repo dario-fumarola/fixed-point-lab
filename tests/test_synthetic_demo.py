@@ -17,3 +17,14 @@ def test_synthetic_demo_runs_with_fista_solver() -> None:
     assert int(metrics["iters_ran"]) >= 1
     assert bool(metrics["objective_monotone"])
     assert metrics["solver"] == "fista"
+
+
+def test_synthetic_demo_runs_with_pg_line_search() -> None:
+    metrics = run_demo(
+        DemoConfig(seed=0, batch_size=4, dim=8, iters=8, solver="pg", alpha_scale=6.0, line_search=True)
+    )
+
+    assert int(metrics["iters_ran"]) >= 1
+    assert bool(metrics["objective_monotone"])
+    assert metrics["solver"] == "pg"
+    assert bool(metrics["line_search"])
