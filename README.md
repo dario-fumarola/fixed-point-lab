@@ -57,3 +57,12 @@ Benchmark with the accelerated solver:
 ```bash
 fplab-benchmark-ops --dim 16 --train-steps 20 --solver fista --operators identity,random,blur
 ```
+
+## Benchmark solver variants
+```bash
+source .venv/bin/activate
+fplab-benchmark-solvers --dim 16 --iters 20 --trials 3 --operators identity,random,blur
+```
+
+This writes a markdown table report to `reports/solver_benchmark.md` by default.
+Use `--report-path <path>` to choose a different output file.

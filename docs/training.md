@@ -18,6 +18,13 @@ Use `--solver fista` in training/demo CLIs to enable acceleration.
 For inference diagnostics in the synthetic demo, proximal-gradient also supports
 backtracking line search via `--line-search` and `--alpha-scale`.
 
+For solver-level comparisons (not training), use:
+```bash
+fplab-benchmark-solvers --dim 16 --iters 20 --trials 3 --operators identity,random,blur
+```
+It benchmarks `pg`, `pg_ls` (PG + line search), `fista`, and `anderson`,
+then writes a markdown report to `reports/solver_benchmark.md` by default.
+
 Operator options currently supported:
 - `identity`: denoising-style setting.
 - `random`: normalized dense sensing matrix.
