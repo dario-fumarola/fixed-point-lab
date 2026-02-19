@@ -9,6 +9,7 @@ from time import perf_counter
 
 import torch
 
+from fplab.data.local_images import build_image_pool, sample_image_patches
 from fplab.models.icnn import ICNNConfig, ICNNRegularizer
 from fplab.operators.fidelity import LeastSquaresFidelity
 from fplab.operators.linear import make_blur_operator, make_identity_operator, make_random_operator
@@ -23,6 +24,10 @@ from fplab.utils.reproducibility import set_seed
 class SolverBenchmarkConfig:
     seed: int = 0
     deterministic: bool = False
+    dataset: str = "synthetic"
+    data_root: str | None = None
+    patch_size: int = 16
+    num_images: int = 64
     dim: int = 16
     batch_size: int = 8
     noise_std: float = 0.03
@@ -40,6 +45,12 @@ _METHODS = ("pg", "pg_ls", "fista", "anderson")
 
 
 def _validate_cfg(cfg: SolverBenchmarkConfig) -> None:
+    if cfg.dataset not in {"synthetic", "image_folder"}:
+        raise ValueError("dataset must be one of: synthetic, image_folder")
+    if cfg.patch_size < 1:
+        raise ValueError("patch_size must be >= 1")
+    if cfg.num_images < 1:
+        raise ValueError("num_images must be >= 1")
     if cfg.dim < 1:
         raise ValueError("dim must be >= 1")
     if cfg.batch_size < 1:
@@ -56,6 +67,14 @@ def _validate_cfg(cfg: SolverBenchmarkConfig) -> None:
         raise ValueError("anderson_history must be >= 1")
     if not cfg.operators:
         raise ValueError("operators must contain at least one entry")
+    if cfg.dataset == "image_folder":
+        if cfg.data_root is None:
+            raise ValueError("data_root is required when dataset=image_folder")
+        data_root = Path(cfg.data_root)
+        if not data_root.exists():
+            raise ValueError(f"data_root does not exist: {data_root}")
+        if not data_root.is_dir():
+            raise ValueError(f"data_root must be a directory: {data_root}")
 
 
 def _make_operator(dim: int, operator: str) -> torch.Tensor:
@@ -75,6 +94,19 @@ def _sample_batch(
     noise_std: float,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     x_true = torch.randn(batch_size, dim)
+    y_clean = x_true @ A.T
+    y = y_clean + noise_std * torch.randn_like(y_clean)
+    return x_true, y
+
+
+def _sample_real_batch(
+    images: list[torch.Tensor],
+    batch_size: int,
+    patch_size: int,
+    A: torch.Tensor,
+    noise_std: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    x_true = sample_image_patches(images=images, batch_size=batch_size, patch_size=patch_size)
     y_clean = x_true @ A.T
     y = y_clean + noise_std * torch.randn_like(y_clean)
     return x_true, y
@@ -207,7 +239,15 @@ def _format_markdown_report(
     lines: list[str] = []
     lines.append("# Solver Benchmark Report")
     lines.append("")
-    lines.append(f"- dim: `{cfg.dim}`")
+    lines.append(f"- dataset: `{cfg.dataset}`")
+    if cfg.dataset == "synthetic":
+        lines.append(f"- dim: `{cfg.dim}`")
+    else:
+        lines.append(f"- patch_size: `{cfg.patch_size}`")
+        lines.append(f"- dim (flattened patch): `{cfg.patch_size * cfg.patch_size}`")
+        lines.append(f"- num_images: `{cfg.num_images}`")
+        if cfg.data_root:
+            lines.append(f"- data_root: `{cfg.data_root}`")
     lines.append(f"- batch_size: `{cfg.batch_size}`")
     lines.append(f"- noise_std: `{cfg.noise_std}`")
     lines.append(f"- lambda: `{cfg.lam}`")
@@ -240,6 +280,13 @@ def _format_markdown_report(
 def run_solver_benchmark(cfg: SolverBenchmarkConfig) -> dict[str, dict[str, dict[str, float]]]:
     _validate_cfg(cfg)
     results: dict[str, dict[str, dict[str, float]]] = {}
+    images: list[torch.Tensor] | None = None
+    if cfg.dataset == "image_folder":
+        assert cfg.data_root is not None
+        images = build_image_pool(data_root=Path(cfg.data_root), max_images=cfg.num_images)
+        dim = cfg.patch_size * cfg.patch_size
+    else:
+        dim = cfg.dim
 
     for op_idx, operator in enumerate(cfg.operators):
         per_method_lists: dict[str, dict[str, list[float]]] = {m: _init_accumulators() for m in _METHODS}
@@ -247,16 +294,26 @@ def run_solver_benchmark(cfg: SolverBenchmarkConfig) -> dict[str, dict[str, dict
         for trial in range(cfg.trials):
             set_seed(cfg.seed + 1000 * op_idx + trial, deterministic=cfg.deterministic)
 
-            A = _make_operator(cfg.dim, operator)
+            A = _make_operator(dim, operator)
             fidelity = LeastSquaresFidelity(A=A)
             regularizer = ICNNRegularizer(
-                ICNNConfig(input_dim=cfg.dim, hidden_dims=(64, 64), mu_quadratic=1e-2)
+                ICNNConfig(input_dim=dim, hidden_dims=(64, 64), mu_quadratic=1e-2)
             )
             prox = ICNNProxSolver(ProxConfig(max_iters=cfg.prox_iters, lr=5e-2, tol=1e-6))
             pg_solver = ProxGradSolver(fidelity=fidelity, regularizer=regularizer, prox_solver=prox)
             fista_solver = FISTAProxGradSolver(fidelity=fidelity, regularizer=regularizer, prox_solver=prox)
 
-            x_true, y = _sample_batch(cfg.batch_size, cfg.dim, A, cfg.noise_std)
+            if cfg.dataset == "synthetic":
+                x_true, y = _sample_batch(cfg.batch_size, dim, A, cfg.noise_std)
+            else:
+                assert images is not None
+                x_true, y = _sample_real_batch(
+                    images=images,
+                    batch_size=cfg.batch_size,
+                    patch_size=cfg.patch_size,
+                    A=A,
+                    noise_std=cfg.noise_std,
+                )
             x0 = torch.zeros_like(x_true)
 
             for method in _METHODS:
@@ -294,6 +351,21 @@ def _parse_args() -> SolverBenchmarkConfig:
     parser = argparse.ArgumentParser(description="Benchmark PG/FISTA/Anderson fixed-point solvers.")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--deterministic", action="store_true")
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        choices=["synthetic", "image_folder"],
+        default="synthetic",
+        help="Use synthetic Gaussian vectors or local image-folder patches.",
+    )
+    parser.add_argument(
+        "--data-root",
+        type=str,
+        default=None,
+        help="Path to local image folder (required for --dataset image_folder).",
+    )
+    parser.add_argument("--patch-size", type=int, default=16)
+    parser.add_argument("--num-images", type=int, default=64)
     parser.add_argument("--dim", type=int, default=16)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--noise-std", type=float, default=0.03)
@@ -318,6 +390,10 @@ def _parse_args() -> SolverBenchmarkConfig:
     return SolverBenchmarkConfig(
         seed=args.seed,
         deterministic=args.deterministic,
+        dataset=args.dataset,
+        data_root=args.data_root,
+        patch_size=args.patch_size,
+        num_images=args.num_images,
         dim=args.dim,
         batch_size=args.batch_size,
         noise_std=args.noise_std,

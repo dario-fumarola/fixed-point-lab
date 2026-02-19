@@ -25,6 +25,19 @@ fplab-benchmark-solvers --dim 16 --iters 20 --trials 3 --operators identity,rand
 It benchmarks `pg`, `pg_ls` (PG + line search), `fista`, and `anderson`,
 then writes a markdown report to `reports/solver_benchmark.md` by default.
 
+To benchmark on local real samples, switch dataset mode:
+```bash
+fplab-benchmark-solvers \
+  --dataset image_folder \
+  --data-root /path/to/local/images_or_pt_tensors \
+  --patch-size 16 \
+  --num-images 64 \
+  --iters 20 \
+  --trials 3
+```
+In `image_folder` mode, the benchmark samples patches from local images (or `.pt/.pth`
+tensors), flattens them into vectors, and evaluates the same solver/operator variants.
+
 Operator options currently supported:
 - `identity`: denoising-style setting.
 - `random`: normalized dense sensing matrix.

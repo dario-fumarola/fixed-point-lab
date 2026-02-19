@@ -66,3 +66,18 @@ fplab-benchmark-solvers --dim 16 --iters 20 --trials 3 --operators identity,rand
 
 This writes a markdown table report to `reports/solver_benchmark.md` by default.
 Use `--report-path <path>` to choose a different output file.
+
+Run against local real samples (image-folder mode):
+```bash
+fplab-benchmark-solvers \
+  --dataset image_folder \
+  --data-root /path/to/local/images_or_pt_tensors \
+  --patch-size 16 \
+  --num-images 64 \
+  --iters 20 \
+  --trials 3 \
+  --operators identity,random,blur
+```
+
+`image_folder` mode accepts common image files (`png/jpg/...`) and `.pt/.pth` tensors.
+It samples random patches, flattens them, and applies the same linear inverse operators.
