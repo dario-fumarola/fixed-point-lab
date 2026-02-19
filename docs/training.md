@@ -9,6 +9,12 @@ For each batch:
 
 This gives a practical training loop while keeping the inference solver aligned with the proximal-gradient fixed-point template.
 
+Solver choices:
+- `pg`: plain proximal-gradient updates.
+- `fista`: accelerated proximal-gradient updates.
+
+Use `--solver fista` in training/demo CLIs to enable acceleration.
+
 Operator options currently supported:
 - `identity`: denoising-style setting.
 - `random`: normalized dense sensing matrix.

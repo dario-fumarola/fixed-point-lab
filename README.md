@@ -22,10 +22,20 @@ source .venv/bin/activate
 fplab-demo --dim 32 --iters 30 --lam 0.1
 ```
 
+Try accelerated fixed-point updates:
+```bash
+fplab-demo --dim 32 --iters 30 --lam 0.1 --solver fista
+```
+
 ## Train unrolled synthetic model
 ```bash
 source .venv/bin/activate
 fplab-train-synth --dim 32 --operator blur --solver-iters 6 --prox-iters 60 --train-steps 80
+```
+
+Train with accelerated iterations:
+```bash
+fplab-train-synth --dim 32 --operator blur --solver fista --solver-iters 6 --prox-iters 60 --train-steps 80
 ```
 
 Use `--fixed-batch` to quickly sanity-check that the optimization loop can overfit one batch.
@@ -36,4 +46,9 @@ Use `--deterministic` for stricter reproducibility.
 ```bash
 source .venv/bin/activate
 fplab-benchmark-ops --dim 16 --train-steps 20 --operators identity,random,blur
+```
+
+Benchmark with the accelerated solver:
+```bash
+fplab-benchmark-ops --dim 16 --train-steps 20 --solver fista --operators identity,random,blur
 ```

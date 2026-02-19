@@ -11,6 +11,7 @@ from fplab.models.icnn import ICNNConfig, ICNNRegularizer
 from fplab.operators.fidelity import LeastSquaresFidelity
 from fplab.operators.linear import make_blur_operator, make_identity_operator, make_random_operator
 from fplab.prox.prox_icnn import ICNNProxSolver, ProxConfig
+from fplab.solvers.fista import FISTAProxGradSolver
 from fplab.solvers.proxgrad import ProxGradSolver
 from fplab.utils.reproducibility import set_seed
 
@@ -30,6 +31,7 @@ class TrainConfig:
     grad_clip: float = 5.0
     fixed_batch: bool = False
     operator: str = "random"
+    solver: str = "pg"
     save_path: str | None = None
 
 
@@ -55,6 +57,19 @@ def _sample_batch(
     return x_true, y
 
 
+def _make_solver(
+    solver_name: str,
+    fidelity: LeastSquaresFidelity,
+    regularizer: ICNNRegularizer,
+    prox: ICNNProxSolver,
+) -> ProxGradSolver | FISTAProxGradSolver:
+    if solver_name == "pg":
+        return ProxGradSolver(fidelity=fidelity, regularizer=regularizer, prox_solver=prox)
+    if solver_name == "fista":
+        return FISTAProxGradSolver(fidelity=fidelity, regularizer=regularizer, prox_solver=prox)
+    raise ValueError(f"unsupported solver: {solver_name}")
+
+
 def train_synthetic(cfg: TrainConfig) -> dict[str, float | int]:
     set_seed(cfg.seed, deterministic=cfg.deterministic)
 
@@ -65,7 +80,7 @@ def train_synthetic(cfg: TrainConfig) -> dict[str, float | int]:
         ICNNConfig(input_dim=cfg.dim, hidden_dims=(64, 64), mu_quadratic=1e-2)
     )
     prox = ICNNProxSolver(ProxConfig(max_iters=cfg.prox_iters, lr=3e-2, tol=1e-6))
-    solver = ProxGradSolver(fidelity=fidelity, regularizer=regularizer, prox_solver=prox)
+    solver = _make_solver(cfg.solver, fidelity=fidelity, regularizer=regularizer, prox=prox)
 
     optimizer = torch.optim.Adam(regularizer.parameters(), lr=cfg.learning_rate)
 
@@ -79,15 +94,27 @@ def train_synthetic(cfg: TrainConfig) -> dict[str, float | int]:
         x_true, y = fixed if fixed is not None else _sample_batch(cfg.batch_size, cfg.dim, A, cfg.noise_std)
         x0 = torch.zeros_like(x_true)
 
-        x_hat, _trace = solver.solve(
-            x0=x0,
-            y=y,
-            lam=cfg.lam,
-            max_iter=cfg.solver_iters,
-            tol=0.0,
-            differentiable=True,
-            early_stop=False,
-        )
+        if cfg.solver == "fista":
+            x_hat, _trace = solver.solve(
+                x0=x0,
+                y=y,
+                lam=cfg.lam,
+                max_iter=cfg.solver_iters,
+                tol=0.0,
+                differentiable=True,
+                early_stop=False,
+                monotone=False,
+            )
+        else:
+            x_hat, _trace = solver.solve(
+                x0=x0,
+                y=y,
+                lam=cfg.lam,
+                max_iter=cfg.solver_iters,
+                tol=0.0,
+                differentiable=True,
+                early_stop=False,
+            )
 
         rec_loss = torch.mean((x_hat - x_true) ** 2)
         data_loss = torch.mean(fidelity.value(x_hat, y))
@@ -107,6 +134,7 @@ def train_synthetic(cfg: TrainConfig) -> dict[str, float | int]:
         "final_loss": loss_history[-1],
         "best_loss": min(loss_history),
         "operator_lipschitz": fidelity.lipschitz(),
+        "solver": cfg.solver,
     }
 
     if cfg.save_path:
@@ -140,6 +168,7 @@ def _parse_args() -> TrainConfig:
     parser.add_argument("--grad-clip", type=float, default=5.0)
     parser.add_argument("--fixed-batch", action="store_true")
     parser.add_argument("--operator", type=str, default="random", choices=["random", "identity", "blur"])
+    parser.add_argument("--solver", type=str, default="pg", choices=["pg", "fista"])
     parser.add_argument("--save-path", type=str, default=None)
     args = parser.parse_args()
 
@@ -157,6 +186,7 @@ def _parse_args() -> TrainConfig:
         grad_clip=args.grad_clip,
         fixed_batch=args.fixed_batch,
         operator=args.operator,
+        solver=args.solver,
         save_path=args.save_path,
     )
 

@@ -9,6 +9,7 @@ import torch
 from fplab.models.icnn import ICNNConfig, ICNNRegularizer
 from fplab.operators.fidelity import LeastSquaresFidelity
 from fplab.prox.prox_icnn import ICNNProxSolver, ProxConfig
+from fplab.solvers.fista import FISTAProxGradSolver
 from fplab.solvers.proxgrad import ProxGradSolver
 from fplab.utils.reproducibility import set_seed
 
@@ -22,6 +23,7 @@ class DemoConfig:
     noise_std: float = 0.02
     lam: float = 0.1
     iters: int = 30
+    solver: str = "pg"
 
 
 def _psnr(pred: torch.Tensor, target: torch.Tensor, eps: float = 1e-8) -> float:
@@ -41,7 +43,12 @@ def run_demo(cfg: DemoConfig) -> dict[str, float | int | bool]:
         ICNNConfig(input_dim=cfg.dim, hidden_dims=(64, 64), mu_quadratic=1e-2)
     )
     prox = ICNNProxSolver(ProxConfig(max_iters=250, lr=5e-2, tol=1e-6))
-    solver = ProxGradSolver(fidelity=fidelity, regularizer=reg, prox_solver=prox)
+    if cfg.solver == "fista":
+        solver = FISTAProxGradSolver(fidelity=fidelity, regularizer=reg, prox_solver=prox)
+    elif cfg.solver == "pg":
+        solver = ProxGradSolver(fidelity=fidelity, regularizer=reg, prox_solver=prox)
+    else:
+        raise ValueError(f"unsupported solver: {cfg.solver}")
 
     x_true = torch.randn(cfg.batch_size, cfg.dim)
     y = x_true + cfg.noise_std * torch.randn_like(x_true)
@@ -61,6 +68,7 @@ def run_demo(cfg: DemoConfig) -> dict[str, float | int | bool]:
         "objective_end": trace.objectives[-1],
         "residual_end": trace.residuals[-1],
         "objective_monotone": monotone,
+        "solver": cfg.solver,
         "psnr_noisy": psnr_y,
         "psnr_recon": psnr_x,
     }
@@ -75,6 +83,7 @@ def _parse_args() -> DemoConfig:
     parser.add_argument("--noise-std", type=float, default=0.02)
     parser.add_argument("--lam", type=float, default=0.1)
     parser.add_argument("--iters", type=int, default=30)
+    parser.add_argument("--solver", type=str, default="pg", choices=["pg", "fista"])
     args = parser.parse_args()
 
     return DemoConfig(
@@ -85,6 +94,7 @@ def _parse_args() -> DemoConfig:
         noise_std=args.noise_std,
         lam=args.lam,
         iters=args.iters,
+        solver=args.solver,
     )
 
 

@@ -16,6 +16,7 @@ class BenchmarkConfig:
     train_steps: int = 20
     solver_iters: int = 4
     prox_iters: int = 30
+    solver: str = "pg"
     operators: tuple[str, ...] = ("identity", "random", "blur")
 
 
@@ -31,6 +32,7 @@ def run_benchmark(cfg: BenchmarkConfig) -> dict[str, dict[str, float | int]]:
                 train_steps=cfg.train_steps,
                 solver_iters=cfg.solver_iters,
                 prox_iters=cfg.prox_iters,
+                solver=cfg.solver,
                 operator=operator,
                 fixed_batch=True,
             )
@@ -48,6 +50,7 @@ def _parse_args() -> BenchmarkConfig:
     parser.add_argument("--train-steps", type=int, default=20)
     parser.add_argument("--solver-iters", type=int, default=4)
     parser.add_argument("--prox-iters", type=int, default=30)
+    parser.add_argument("--solver", type=str, default="pg", choices=["pg", "fista"])
     parser.add_argument(
         "--operators",
         type=str,
@@ -64,6 +67,7 @@ def _parse_args() -> BenchmarkConfig:
         train_steps=args.train_steps,
         solver_iters=args.solver_iters,
         prox_iters=args.prox_iters,
+        solver=args.solver,
         operators=tuple(op.strip() for op in args.operators.split(",") if op.strip()),
     )
 
