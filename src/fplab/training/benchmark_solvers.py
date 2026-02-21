@@ -41,7 +41,7 @@ class SolverBenchmarkConfig:
     report_path: str | None = None
 
 
-_METHODS = ("pg", "pg_ls", "fista", "anderson")
+_METHODS = ("pg", "pg_ls", "fista", "fista_ls", "anderson")
 
 
 def _validate_cfg(cfg: SolverBenchmarkConfig) -> None:
@@ -186,6 +186,21 @@ def _run_single_method(
             tol=1e-6,
             monotone=True,
             adaptive_restart=True,
+        )
+        objective = trace.objectives[-1]
+        residual = trace.residuals[-1]
+        iter_count = float(len(trace.residuals))
+    elif method == "fista_ls":
+        x_hat, trace = fista_solver.solve(
+            x0=x0,
+            y=y,
+            lam=lam,
+            max_iter=iters,
+            tol=1e-6,
+            monotone=True,
+            adaptive_restart=True,
+            line_search=True,
+            alpha_scale=alpha_scale_ls,
         )
         objective = trace.objectives[-1]
         residual = trace.residuals[-1]

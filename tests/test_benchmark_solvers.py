@@ -28,7 +28,7 @@ def test_solver_benchmark_smoke() -> None:
     )
 
     assert set(results.keys()) == {"identity"}
-    assert set(results["identity"].keys()) == {"pg", "pg_ls", "fista", "anderson"}
+    assert set(results["identity"].keys()) == {"pg", "pg_ls", "fista", "fista_ls", "anderson"}
 
     for method_metrics in results["identity"].values():
         assert method_metrics["residual_mean"] >= 0.0
@@ -59,6 +59,7 @@ def test_solver_benchmark_report_written(tmp_path) -> None:
     assert "`pg`" in report
     assert "`pg_ls`" in report
     assert "`fista`" in report
+    assert "`fista_ls`" in report
     assert "`anderson`" in report
 
 
@@ -88,7 +89,7 @@ def test_solver_benchmark_image_folder_mode(tmp_path) -> None:
     )
 
     assert set(results.keys()) == {"identity"}
-    assert set(results["identity"].keys()) == {"pg", "pg_ls", "fista", "anderson"}
+    assert set(results["identity"].keys()) == {"pg", "pg_ls", "fista", "fista_ls", "anderson"}
     for method_metrics in results["identity"].values():
         assert method_metrics["residual_mean"] >= 0.0
         for value in method_metrics.values():
