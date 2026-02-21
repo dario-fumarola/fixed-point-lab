@@ -81,3 +81,28 @@ fplab-benchmark-solvers \
 
 `image_folder` mode accepts common image files (`png/jpg/...`) and `.pt/.pth` tensors.
 It samples random patches, flattens them, and applies the same linear inverse operators.
+
+## Differentiable Fixed-Point Layer
+
+Use the new `FixedPointLayer` module for NN-style integration of the solver.
+
+```python
+import torch
+from fplab.layers import FixedPointLayer, FixedPointLayerConfig
+from fplab.models.icnn import ICNNConfig, ICNNRegularizer
+from fplab.operators.fidelity import LeastSquaresFidelity
+from fplab.prox.prox_icnn import ICNNProxSolver, ProxConfig
+
+layer = FixedPointLayer(
+    fidelity=LeastSquaresFidelity(A=torch.eye(6)),
+    regularizer=ICNNRegularizer(ICNNConfig(input_dim=6, hidden_dims=(16, 16), mu_quadratic=1e-2)),
+    prox_solver=ICNNProxSolver(ProxConfig(max_iters=20, lr=5e-2)),
+    config=FixedPointLayerConfig(solver="pg", max_iter=6, differentiable=True),
+    lam=0.1,
+)
+
+y = torch.randn(4, 6)
+x_hat = layer(y)
+```
+
+`FixedPointLayer(..., return_trace=True)` returns `(x_hat, trace)` with per-iteration diagnostics.
