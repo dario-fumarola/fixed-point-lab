@@ -21,6 +21,14 @@ class ICNNProxSolver:
 
     def __init__(self, config: ProxConfig | None = None) -> None:
         self.config = config or ProxConfig()
+        if self.config.max_iters < 1:
+            raise ValueError("max_iters must be >= 1")
+        if self.config.lr <= 0:
+            raise ValueError("lr must be positive")
+        if self.config.tol < 0:
+            raise ValueError("tol must be nonnegative")
+        if self.config.rel_tol < 0:
+            raise ValueError("rel_tol must be nonnegative")
 
     def prox(
         self,
@@ -40,25 +48,37 @@ class ICNNProxSolver:
         converged = False
         last_grad_norm = float("inf")
         threshold = float("inf")
+        iters_ran = 0
+        rel_tol = self.config.rel_tol
+        abs_tol = self.config.tol
 
         for it in range(1, self.config.max_iters + 1):
             obj = 0.5 * torch.sum((x - v) ** 2, dim=-1) + alpha * lam * regularizer(x)
-            total = torch.mean(obj)
+            # Sum (not mean) keeps each sample's prox update invariant to batch size.
+            total = torch.sum(obj)
             (grad,) = torch.autograd.grad(total, x, create_graph=differentiable)
             x = x - self.config.lr * grad
             if not differentiable:
                 x = x.detach().requires_grad_(True)
-            last_grad_norm = float(torch.linalg.norm(grad).item())
-            x_norm = float(torch.linalg.norm(x).item())
-            threshold = max(self.config.tol, self.config.rel_tol * x_norm)
 
-            if last_grad_norm <= threshold:
+            grad_norm_per_sample = torch.linalg.vector_norm(grad.detach(), dim=-1)
+            if rel_tol > 0.0:
+                x_norm_per_sample = torch.linalg.vector_norm(x.detach(), dim=-1)
+                threshold_per_sample = torch.clamp(rel_tol * x_norm_per_sample, min=abs_tol)
+            else:
+                threshold_per_sample = torch.full_like(grad_norm_per_sample, fill_value=abs_tol)
+
+            last_grad_norm = float(torch.max(grad_norm_per_sample).item())
+            threshold = float(torch.max(threshold_per_sample).item())
+            iters_ran = it
+
+            if bool(torch.all(grad_norm_per_sample <= threshold_per_sample)):
                 converged = True
                 break
 
         result = x if differentiable else x.detach()
         return result, ProxStopInfo(
-            iters=it,
+            iters=iters_ran,
             grad_norm=last_grad_norm,
             threshold=threshold,
             converged=converged,

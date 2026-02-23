@@ -20,3 +20,21 @@ def test_benchmark_operators_smoke() -> None:
     for metrics in results.values():
         assert float(metrics["initial_loss"]) > 0
         assert float(metrics["best_loss"]) <= float(metrics["initial_loss"]) + 1e-6
+
+
+def test_benchmark_operators_supports_fista_solver() -> None:
+    results = run_benchmark(
+        BenchmarkConfig(
+            seed=0,
+            dim=8,
+            batch_size=8,
+            train_steps=3,
+            solver_iters=2,
+            prox_iters=10,
+            solver="fista",
+            operators=("identity",),
+        )
+    )
+
+    assert set(results.keys()) == {"identity"}
+    assert results["identity"]["solver"] == "fista"

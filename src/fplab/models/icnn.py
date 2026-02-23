@@ -29,6 +29,14 @@ class ICNNConfig:
     hidden_dims: tuple[int, ...] = (64, 64)
     mu_quadratic: float = 1e-3
 
+    def __post_init__(self) -> None:
+        if self.input_dim < 1:
+            raise ValueError("input_dim must be >= 1")
+        if len(self.hidden_dims) == 0:
+            raise ValueError("hidden_dims must be non-empty")
+        if any(width < 1 for width in self.hidden_dims):
+            raise ValueError("all hidden_dims entries must be >= 1")
+
 
 class ICNNRegularizer(nn.Module):
     """Input-convex neural regularizer R_theta(x)."""

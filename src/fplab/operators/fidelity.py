@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import torch
 
@@ -23,6 +23,7 @@ class LeastSquaresFidelity(Fidelity):
     """Least-squares fidelity: f(x;y)=0.5*||Ax-y||^2."""
 
     A: torch.Tensor
+    _lipschitz_cache: float | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
         if self.A.dim() != 2:
@@ -38,8 +39,10 @@ class LeastSquaresFidelity(Fidelity):
 
     def lipschitz(self) -> float:
         # For f(x)=0.5||Ax-y||^2, grad-Lipschitz constant is ||A||_2^2.
-        spectral = torch.linalg.matrix_norm(self.A, ord=2)
-        return float((spectral * spectral).item())
+        if self._lipschitz_cache is None:
+            spectral = torch.linalg.matrix_norm(self.A, ord=2)
+            self._lipschitz_cache = float((spectral * spectral).item())
+        return self._lipschitz_cache
 
     def _apply_A(self, x: torch.Tensor) -> torch.Tensor:
         return x @ self.A.T
