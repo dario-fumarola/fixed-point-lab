@@ -42,7 +42,19 @@ class FixedPointLayer(nn.Module):
     """
 
     _solver_default_kwargs_by_name: dict[str, set[str]] = {
-        "pg": {"x0", "y", "lam", "max_iter", "tol", "differentiable", "early_stop", "alpha_scale", "backtrack_factor", "max_backtracks"},
+        "pg": {
+            "x0",
+            "y",
+            "lam",
+            "max_iter",
+            "tol",
+            "differentiable",
+            "early_stop",
+            "alpha_scale",
+            "backtrack_factor",
+            "max_backtracks",
+            "line_search",
+        },
         "fista": {
             "x0",
             "y",
@@ -127,7 +139,9 @@ class FixedPointLayer(nn.Module):
             "max_backtracks": self.config.max_backtracks,
         }
 
-        if self.solver == "fista":
+        if self.solver == "pg":
+            base["line_search"] = self.config.line_search
+        else:
             base.update(
                 {
                     "monotone": self.config.monotone,

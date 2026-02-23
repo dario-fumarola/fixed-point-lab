@@ -115,13 +115,6 @@ class FISTAProxGradSolver:
 
         if not accepted:
             # Keep the smallest attempted step if Armijo-style condition did not pass.
-            chosen_x, chosen_grad_norm, chosen_threshold = self._prox_step(
-                x_ref=x_ref,
-                y=y,
-                lam=lam,
-                alpha=chosen_alpha,
-                differentiable=differentiable,
-            )
             chosen_backtracks = max_backtracks
 
         return chosen_x, chosen_grad_norm, chosen_threshold, chosen_alpha, chosen_backtracks

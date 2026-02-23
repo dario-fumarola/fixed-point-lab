@@ -145,6 +145,28 @@ def test_layer_overrides_default_lam_and_runtime_kwargs() -> None:
     assert len(trace.residuals) == 1
 
 
+def test_layer_pg_line_search_override_works() -> None:
+    layer, dim = _build_layer(solver="pg", differentiable=False, max_iter=4, early_stop=False)
+    y = torch.randn(4, dim)
+
+    x_ls, trace_ls = layer(
+        y,
+        return_trace=True,
+        solver_overrides={"line_search": True, "alpha_scale": 8.0},
+    )
+
+    x_no_ls, trace_no_ls = layer(
+        y,
+        return_trace=True,
+        solver_overrides={"line_search": False},
+    )
+
+    assert x_ls.shape == y.shape
+    assert x_no_ls.shape == y.shape
+    assert len(trace_ls.backtracks) == len(trace_ls.residuals)
+    assert len(trace_no_ls.backtracks) == len(trace_no_ls.residuals)
+
+
 def test_invalid_solver_override_raises() -> None:
     layer, dim = _build_layer()
     y = torch.randn(2, dim)

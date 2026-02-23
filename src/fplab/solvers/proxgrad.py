@@ -102,16 +102,6 @@ class ProxGradSolver:
         if not accepted:
             # Use the smallest tried step if Armijo-style condition did not pass.
             alpha_used = alpha0 * (backtrack_factor**max_backtracks)
-            v = x - alpha_used * grad
-            x_next, info = self.prox_solver.prox(
-                v,
-                alpha=alpha_used,
-                lam=lam,
-                regularizer=self.regularizer,
-                differentiable=False,
-            )
-            info_grad_norm = info.grad_norm
-            info_threshold = info.threshold
             backtracks = max_backtracks
 
         return x_next, info_grad_norm, info_threshold, alpha_used, backtracks
