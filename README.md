@@ -1,12 +1,17 @@
 # fixed-point-lab
 
-Research repo for convergence-guaranteed neural fixed-point solvers for inverse problems.
+Research repo for convex-structured neural fixed-point solvers for inverse problems.
 
 ## Initial scope
 - Convex ICNN regularizer with hard convexity constraints
 - Proximal-gradient fixed-point solver
 - Generic Krasnoselskii-Mann fixed-point iterator
 - Unit tests checking convexity, prox residual behavior, and convergence on least-squares tasks
+
+## Convergence scope
+- For convex composite objectives with `alpha in (0, 1 / L_f]`, proximal-gradient has standard convergence guarantees.
+- This repo uses inexact prox solves in practice; solver traces expose residual and objective behavior for diagnostics.
+- Differentiable unrolled training keeps updates smooth for backprop and may disable non-smooth safeguards used in inference mode.
 
 ## Quickstart
 ```bash

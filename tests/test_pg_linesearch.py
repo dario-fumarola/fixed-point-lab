@@ -35,6 +35,8 @@ def test_pg_linesearch_recovers_from_aggressive_initial_step_size() -> None:
         assert curr <= prev + 2e-4
     assert any(bt > 0 for bt in trace.backtracks)
     assert all(alpha > 0 for alpha in trace.step_sizes)
+    assert len(trace.line_search_accepted) == len(trace.objectives)
+    assert all(isinstance(item, bool) for item in trace.line_search_accepted)
 
 
 def test_pg_linesearch_disallowed_in_differentiable_mode() -> None:

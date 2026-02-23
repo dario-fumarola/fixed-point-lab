@@ -69,7 +69,7 @@ def build_image_pool(data_root: Path, max_images: int = 64) -> list[torch.Tensor
         raise ValueError(f"data_root must be a directory: {data_root}")
 
     selected: list[Path] = []
-    for path in data_root.rglob("*"):
+    for path in sorted(data_root.rglob("*")):
         if _is_supported_path(path):
             selected.append(path)
             if len(selected) >= max_images:

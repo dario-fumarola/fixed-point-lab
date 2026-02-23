@@ -57,6 +57,8 @@ def test_fista_line_search_uses_backtracking_for_aggressive_step() -> None:
     assert any(backtrack > 0 for backtrack in trace.backtracks)
     assert all(size > 0.0 for size in trace.step_sizes)
     assert all(item >= 0 for item in trace.backtracks)
+    assert len(trace.line_search_accepted) == len(trace.objectives)
+    assert all(isinstance(item, bool) for item in trace.line_search_accepted)
     assert all(curr <= prev + 1e-4 for prev, curr in zip(trace.objectives, trace.objectives[1:]))
 
 

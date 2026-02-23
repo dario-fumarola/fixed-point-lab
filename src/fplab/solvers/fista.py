@@ -20,6 +20,7 @@ class FISTATrace:
     backtracks: list[int]
     momenta: list[float]
     restarts: list[bool]
+    line_search_accepted: list[bool]
 
 
 class FISTAProxGradSolver:
@@ -66,7 +67,7 @@ class FISTAProxGradSolver:
         differentiable: bool,
         backtrack_factor: float = 0.5,
         max_backtracks: int = 12,
-    ) -> tuple[torch.Tensor, float, float, float, int]:
+    ) -> tuple[torch.Tensor, float, float, float, int, bool]:
         if not (0.0 < backtrack_factor < 1.0):
             raise ValueError("backtrack_factor must be in (0, 1)")
         if max_backtracks < 0:
@@ -95,17 +96,7 @@ class FISTAProxGradSolver:
 
             diff = x_next - x_ref
             majorizer = f_x + torch.sum(grad * diff, dim=-1) + (0.5 / alpha) * torch.sum(diff * diff, dim=-1)
-            lhs = torch.mean(self.fidelity.value(x_next, y))
-            rhs = torch.mean(majorizer)
-
-            if lhs.item() <= rhs.item() + 1e-8:
-                accepted = True
-                chosen_x = x_next
-                chosen_grad_norm = info_grad_norm
-                chosen_threshold = info_threshold
-                chosen_alpha = alpha
-                chosen_backtracks = backtracks
-                break
+            lhs = self.fidelity.value(x_next, y)
 
             chosen_x = x_next
             chosen_grad_norm = info_grad_norm
@@ -113,11 +104,15 @@ class FISTAProxGradSolver:
             chosen_alpha = alpha
             chosen_backtracks = backtracks
 
+            if bool(torch.all(lhs <= majorizer + 1e-8)):
+                accepted = True
+                break
+
         if not accepted:
             # Keep the smallest attempted step if Armijo-style condition did not pass.
             chosen_backtracks = max_backtracks
 
-        return chosen_x, chosen_grad_norm, chosen_threshold, chosen_alpha, chosen_backtracks
+        return chosen_x, chosen_grad_norm, chosen_threshold, chosen_alpha, chosen_backtracks, accepted
 
     def solve(
         self,
@@ -159,6 +154,7 @@ class FISTAProxGradSolver:
         backtracks: list[int] = []
         momenta: list[float] = []
         restarts: list[bool] = []
+        line_search_accepted: list[bool] = []
 
         obj_x = torch.mean(self.objective(x, y, lam))
 
@@ -169,7 +165,7 @@ class FISTAProxGradSolver:
             y_k = x + beta * (x - x_prev)
 
             if line_search:
-                x_next, prox_grad_norm, prox_threshold, step_size, n_backtracks = self._line_search_step(
+                x_next, prox_grad_norm, prox_threshold, step_size, n_backtracks, accepted = self._line_search_step(
                     x_ref=y_k,
                     y=y,
                     lam=lam,
@@ -188,6 +184,7 @@ class FISTAProxGradSolver:
                 )
                 step_size = alpha
                 n_backtracks = 0
+                accepted = True
 
             # Adaptive restart is done in non-differentiable mode to avoid
             # graph-discontinuous control flow during unrolled training.
@@ -200,7 +197,7 @@ class FISTAProxGradSolver:
                     beta = 0.0
                     y_k = x
                     if line_search:
-                        x_next, prox_grad_norm, prox_threshold, step_size, n_backtracks = self._line_search_step(
+                        x_next, prox_grad_norm, prox_threshold, step_size, n_backtracks, accepted = self._line_search_step(
                             x_ref=y_k,
                             y=y,
                             lam=lam,
@@ -219,6 +216,7 @@ class FISTAProxGradSolver:
                         )
                         step_size = alpha
                         n_backtracks = 0
+                        accepted = True
 
             obj_next = torch.mean(self.objective(x_next, y, lam))
 
@@ -227,7 +225,7 @@ class FISTAProxGradSolver:
             if monotone and not differentiable and obj_next.item() > obj_x.item() + 1e-8:
                 restarted = True
                 if line_search:
-                    x_pg, pg_grad_norm, pg_threshold, step_size, n_backtracks = self._line_search_step(
+                    x_pg, pg_grad_norm, pg_threshold, step_size, n_backtracks, pg_accepted = self._line_search_step(
                         x_ref=x,
                         y=y,
                         lam=lam,
@@ -246,6 +244,7 @@ class FISTAProxGradSolver:
                     )
                     step_size = alpha
                     n_backtracks = 0
+                    pg_accepted = True
                 obj_pg = torch.mean(self.objective(x_pg, y, lam))
 
                 if obj_pg.item() <= obj_next.item():
@@ -253,6 +252,7 @@ class FISTAProxGradSolver:
                     prox_grad_norm = pg_grad_norm
                     prox_threshold = pg_threshold
                     obj_next = obj_pg
+                    accepted = pg_accepted
 
                 if obj_next.item() > obj_x.item() + 1e-8:
                     x_next = x
@@ -261,6 +261,7 @@ class FISTAProxGradSolver:
                     step_size = 0.0
                     n_backtracks = 0
                     obj_next = obj_x
+                    accepted = False
 
                 t_next = 1.0
                 beta = 0.0
@@ -274,6 +275,7 @@ class FISTAProxGradSolver:
             backtracks.append(int(n_backtracks))
             momenta.append(float(beta))
             restarts.append(restarted)
+            line_search_accepted.append(bool(accepted))
 
             x_prev, x = x, x_next
             obj_x = obj_next
@@ -291,4 +293,5 @@ class FISTAProxGradSolver:
             backtracks=backtracks,
             momenta=momenta,
             restarts=restarts,
+            line_search_accepted=line_search_accepted,
         )

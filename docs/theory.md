@@ -4,18 +4,19 @@ We target convex composite objectives:
 
 F(x) = f(x; y) + lambda * R_theta(x)
 
-with f convex smooth (Lipschitz gradient) and R_theta proper closed convex.
-The solver uses proximal-gradient updates:
+with `f` convex smooth (Lipschitz gradient) and `R_theta` proper closed convex.
+The core update is proximal-gradient:
 
 x_{k+1} = prox_{alpha * lambda * R_theta}(x_k - alpha * grad f(x_k; y))
 
-For alpha in (0, 1 / L_f], proximal-gradient converges to a minimizer under standard assumptions.
+For `alpha in (0, 1 / L_f]` and an exact prox, proximal-gradient has standard convergence guarantees.
 
-When an aggressive step estimate is used, a backtracking majorization check can be applied:
+This repository uses inexact prox subproblem solves in practice. Empirical stability is tracked with
+objective/residual traces and optional line-search safeguards. With line search, we enforce:
 
 f(x_{k+1}) <= f(x_k) + <grad f(x_k), x_{k+1} - x_k> + (1 / (2 alpha_k)) ||x_{k+1} - x_k||^2
 
-This recovers stable descent by shrinking `alpha_k` until the condition is satisfied.
+by shrinking `alpha_k` until the condition is met.
 
 The repo also supports accelerated proximal-gradient (FISTA):
 
@@ -28,3 +29,6 @@ increases the objective).
 For generic fixed-point maps `x = T(x)`, the codebase includes:
 - Krasnoselskii-Mann iteration
 - Anderson acceleration (regularized multisecant mixing)
+
+Differentiable unrolled training is a separate regime: it prioritizes gradient flow through finite
+iterations and may disable non-smooth safeguards that are used for inference-time robustness.

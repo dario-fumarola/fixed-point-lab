@@ -13,4 +13,9 @@ def set_seed(seed: int, deterministic: bool = False) -> None:
 
     if deterministic:
         torch.use_deterministic_algorithms(True)
+        torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
+    else:
+        torch.use_deterministic_algorithms(False)
+        torch.backends.cudnn.deterministic = False
+        torch.backends.cudnn.benchmark = True

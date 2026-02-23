@@ -17,6 +17,7 @@ class SolveTrace:
     prox_thresholds: list[float]
     step_sizes: list[float]
     backtracks: list[int]
+    line_search_accepted: list[bool]
 
 
 class ProxGradSolver:
@@ -37,7 +38,7 @@ class ProxGradSolver:
         line_search: bool = False,
         backtrack_factor: float = 0.5,
         max_backtracks: int = 12,
-    ) -> tuple[torch.Tensor, float, float, float, int]:
+    ) -> tuple[torch.Tensor, float, float, float, int, bool]:
         if lam < 0:
             raise ValueError("lam must be nonnegative")
         if alpha_scale <= 0:
@@ -65,7 +66,7 @@ class ProxGradSolver:
                 regularizer=self.regularizer,
                 differentiable=differentiable,
             )
-            return x_next, info.grad_norm, info.threshold, alpha0, 0
+            return x_next, info.grad_norm, info.threshold, alpha0, 0, True
 
         f_x = self.fidelity.value(x, y)
         x_next = x
@@ -89,22 +90,20 @@ class ProxGradSolver:
             f_candidate = self.fidelity.value(candidate, y)
             majorizer = f_x + torch.sum(grad * diff, dim=-1) + (0.5 / alpha) * torch.sum(diff * diff, dim=-1)
 
-            lhs = torch.mean(f_candidate)
-            rhs = torch.mean(majorizer)
-            if lhs.item() <= rhs.item() + 1e-8:
-                x_next = candidate
-                info_grad_norm = info.grad_norm
-                info_threshold = info.threshold
-                alpha_used = alpha
+            x_next = candidate
+            info_grad_norm = info.grad_norm
+            info_threshold = info.threshold
+            alpha_used = alpha
+
+            if bool(torch.all(f_candidate <= majorizer + 1e-8)):
                 accepted = True
                 break
 
         if not accepted:
             # Use the smallest tried step if Armijo-style condition did not pass.
-            alpha_used = alpha0 * (backtrack_factor**max_backtracks)
             backtracks = max_backtracks
 
-        return x_next, info_grad_norm, info_threshold, alpha_used, backtracks
+        return x_next, info_grad_norm, info_threshold, alpha_used, backtracks, accepted
 
     def objective(self, x: torch.Tensor, y: torch.Tensor, lam: float) -> torch.Tensor:
         return self.fidelity.value(x, y) + lam * self.regularizer(x)
@@ -130,9 +129,10 @@ class ProxGradSolver:
         prox_thresholds: list[float] = []
         step_sizes: list[float] = []
         backtracks_used: list[int] = []
+        line_search_accepted: list[bool] = []
 
         for _ in range(max_iter):
-            x_next, prox_grad_norm, prox_threshold, alpha, n_backtracks = self.step(
+            x_next, prox_grad_norm, prox_threshold, alpha, n_backtracks, accepted = self.step(
                 x,
                 y,
                 lam,
@@ -148,6 +148,7 @@ class ProxGradSolver:
             prox_thresholds.append(prox_threshold)
             step_sizes.append(alpha)
             backtracks_used.append(n_backtracks)
+            line_search_accepted.append(bool(accepted))
             obj = torch.mean(self.objective(x_next, y, lam))
             objectives.append(float(obj.item()))
             x = x_next
@@ -162,4 +163,5 @@ class ProxGradSolver:
             prox_thresholds=prox_thresholds,
             step_sizes=step_sizes,
             backtracks=backtracks_used,
+            line_search_accepted=line_search_accepted,
         )

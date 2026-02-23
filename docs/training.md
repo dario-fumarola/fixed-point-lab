@@ -9,6 +9,11 @@ For each batch:
 
 This gives a practical training loop while keeping the inference solver aligned with the proximal-gradient fixed-point template.
 
+Guarantee boundary:
+- Inference-mode convergence arguments rely on convex assumptions and step-size/safeguard conditions.
+- Unrolled training uses finite differentiable iterations and is optimized as a bilevel surrogate objective.
+- During differentiable unrolling, some non-smooth safeguards are intentionally disabled to keep gradients well-defined.
+
 Solver choices:
 - `pg`: plain proximal-gradient updates.
 - `fista`: accelerated proximal-gradient updates.
